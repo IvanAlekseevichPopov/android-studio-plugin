@@ -1,8 +1,8 @@
 package com.crowdin.action;
 
 import com.crowdin.client.Crowdin;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
 import com.crowdin.client.CrowdinPropertiesLoader;
 import com.crowdin.client.sourcefiles.model.Branch;
 import com.crowdin.logic.BranchLogic;
@@ -44,18 +44,18 @@ public class DownloadSourceFromContextAction extends BackgroundAction {
             }
             indicator.checkCanceled();
 
-            CrowdinProperties properties;
+            CrowdinConfiguration crowdinConfiguration;
             try {
-                properties = CrowdinPropertiesLoader.load(project);
+                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
             } catch (Exception e) {
                 NotificationUtil.showErrorMessage(project, e.getMessage());
                 return;
             }
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
 
             indicator.checkCanceled();
@@ -65,7 +65,7 @@ public class DownloadSourceFromContextAction extends BackgroundAction {
 
             Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
 
-            Long sourceId = ContextLogic.findSourceIdFromSourceFile(properties, crowdinProjectCache.getFileInfos(branch), file, root);
+            Long sourceId = ContextLogic.findSourceIdFromSourceFile(crowdinConfiguration, crowdinProjectCache.getFileInfos(branch), file, root);
             URL url = crowdin.downloadFile(sourceId);
             FileUtil.downloadFile(this, file, url);
             NotificationUtil.showInformationMessage(project, MESSAGES_BUNDLE.getString("messages.success.download_source"));
@@ -86,7 +86,7 @@ public class DownloadSourceFromContextAction extends BackgroundAction {
         final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(e.getDataContext());
         boolean isSourceFile = false;
         try {
-            CrowdinProperties properties = CrowdinPropertiesLoader.load(project);
+            CrowdinConfiguration properties = CrowdinPropertiesLoader.load(project);
             isSourceFile = properties.getFiles()
                 .stream()
                 .flatMap(fb -> FileUtil.getSourceFilesRec(FileUtil.getProjectBaseDir(project), fb.getSource()).stream())

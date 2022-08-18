@@ -1,10 +1,7 @@
 package com.crowdin.action;
 
-import com.crowdin.client.Crowdin;
-import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
-import com.crowdin.client.CrowdinPropertiesLoader;
-import com.crowdin.client.RequestBuilder;
+import com.crowdin.client.*;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.languages.model.Language;
 import com.crowdin.client.sourcefiles.model.Branch;
 import com.crowdin.logic.BranchLogic;
@@ -47,19 +44,19 @@ public class DownloadTranslationFromContextAction extends BackgroundAction {
             }
             indicator.checkCanceled();
 
-            CrowdinProperties properties;
+            CrowdinConfiguration crowdinConfiguration;
             try {
-                properties = CrowdinPropertiesLoader.load(project);
+                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
             } catch (Exception e) {
                 NotificationUtil.showErrorMessage(project, e.getMessage());
                 return;
             }
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
             indicator.checkCanceled();
 
@@ -73,10 +70,10 @@ public class DownloadTranslationFromContextAction extends BackgroundAction {
 
             Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
 
-            Pair<VirtualFile, Language> source = ContextLogic.findSourceFileFromTranslationFile(file, properties, root, crowdinProjectCache)
+            Pair<VirtualFile, Language> source = ContextLogic.findSourceFileFromTranslationFile(file, crowdinConfiguration, root, crowdinProjectCache)
                 .orElseThrow(() -> new RuntimeException(MESSAGES_BUNDLE.getString("errors.file_no_representative_context")));
 
-            Long sourceId = ContextLogic.findSourceIdFromSourceFile(properties, crowdinProjectCache.getFileInfos(branch), source.getLeft(), root);
+            Long sourceId = ContextLogic.findSourceIdFromSourceFile(crowdinConfiguration, crowdinProjectCache.getFileInfos(branch), source.getLeft(), root);
 
             URL url = crowdin.downloadFileTranslation(sourceId, RequestBuilder.buildProjectFileTranslation(source.getRight().getId()));
             FileUtil.downloadFile(this, file, url);
@@ -97,24 +94,24 @@ public class DownloadTranslationFromContextAction extends BackgroundAction {
             if (file == null) {
                 return;
             }
-            CrowdinProperties properties;
+            CrowdinConfiguration crowdinConfiguration;
             try {
-                properties = CrowdinPropertiesLoader.load(project);
+                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
             } catch (Exception exception) {
                 return;
             }
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            String branchName = ActionUtils.getBranchName(project, properties, false);
+            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, false);
 
             CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
                 CrowdinProjectCacheProvider.getInstance(crowdin, branchName, false);
 
-            isTranslationFile = ContextLogic.findSourceFileFromTranslationFile(file, properties, root, crowdinProjectCache).isPresent();
+            isTranslationFile = ContextLogic.findSourceFileFromTranslationFile(file, crowdinConfiguration, root, crowdinProjectCache).isPresent();
         } catch (Exception exception) {
 //            do nothing
         } finally {

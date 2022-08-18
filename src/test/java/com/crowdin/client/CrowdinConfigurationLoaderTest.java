@@ -6,7 +6,7 @@ import static com.crowdin.client.CrowdinPropertiesLoader.isBaseUrlValid;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class CrowdinPropertiesLoaderTest {
+public class CrowdinConfigurationLoaderTest {
 
     @Test
     public void isBaseUrlValidTest() {

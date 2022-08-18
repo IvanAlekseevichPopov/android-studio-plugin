@@ -1,7 +1,6 @@
 package com.crowdin.event;
 
 import com.crowdin.client.*;
-import com.crowdin.client.sourcefiles.model.AddBranchRequest;
 import com.crowdin.client.sourcefiles.model.Branch;
 import com.crowdin.logic.BranchLogic;
 import com.crowdin.logic.SourceLogic;
@@ -19,7 +18,6 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.util.messages.MessageBusConnection;
-import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -64,16 +62,16 @@ public class FileChangeListener implements Disposable, BulkFileListener {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
-                    CrowdinProperties properties;
+                    CrowdinConfiguration crowdinConfiguration;
                     try {
-                        properties = CrowdinPropertiesLoader.load(project);
+                        crowdinConfiguration = CrowdinPropertiesLoader.load(project);
                     } catch (Exception e) {
                         return;
                     }
                     indicator.checkCanceled();
-                    Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+                    Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-                    BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+                    BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
                     String branchName = branchLogic.acquireBranchName(true);
 
                     CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
@@ -81,7 +79,7 @@ public class FileChangeListener implements Disposable, BulkFileListener {
                     indicator.checkCanceled();
 
                     Map<FileBean, List<VirtualFile>> allSources = new HashMap<>();
-                    for (FileBean fileBean : properties.getFiles()) {
+                    for (FileBean fileBean : crowdinConfiguration.getFiles()) {
                         allSources.put(fileBean, FileUtil.getSourceFilesRec(FileUtil.getProjectBaseDir(project), fileBean.getSource()));
                     }
 
@@ -89,7 +87,7 @@ public class FileChangeListener implements Disposable, BulkFileListener {
                     for (VFileEvent event : events) {
                         VirtualFile eventFile = event.getFile();
                         if (eventFile != null) {
-                            for (FileBean fileBean : properties.getFiles()) {
+                            for (FileBean fileBean : crowdinConfiguration.getFiles()) {
                                 if (allSources.get(fileBean).contains(eventFile)) {
                                     changedSources.putIfAbsent(fileBean, new ArrayList<>());
                                     changedSources.get(fileBean).add(eventFile);
@@ -113,7 +111,7 @@ public class FileChangeListener implements Disposable, BulkFileListener {
                         .collect(Collectors.joining(","));
                     indicator.setText(String.format(MESSAGES_BUNDLE.getString("messages.uploading_file_s"), text, changedSources.size() == 1 ? "" : "s"));
 
-                    SourceLogic.processSources(project, FileUtil.getProjectBaseDir(project), crowdin, crowdinProjectCache, branch, properties.isPreserveHierarchy(), changedSources);
+                    SourceLogic.processSources(project, FileUtil.getProjectBaseDir(project), crowdin, crowdinProjectCache, branch, crowdinConfiguration.isPreserveHierarchy(), changedSources);
 
                     CrowdinProjectCacheProvider.outdateBranch(branchName);
                 } catch (ProcessCanceledException e) {

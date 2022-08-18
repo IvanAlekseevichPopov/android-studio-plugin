@@ -1,7 +1,7 @@
 package com.crowdin.logic;
 
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
 import com.crowdin.client.FileBean;
 import com.crowdin.client.languages.model.Language;
 import com.crowdin.client.sourcefiles.model.FileInfo;
@@ -22,10 +22,10 @@ import static com.crowdin.Constants.MESSAGES_BUNDLE;
 public class ContextLogic {
 
     public static Optional<Pair<VirtualFile, Language>> findSourceFileFromTranslationFile(
-        VirtualFile file, CrowdinProperties properties, VirtualFile root, CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache
+            VirtualFile file, CrowdinConfiguration crowdinConfiguration, VirtualFile root, CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache
     ) {
         Path filePath = Paths.get(file.getPath());
-        for (FileBean fileBean : properties.getFiles()) {
+        for (FileBean fileBean : crowdinConfiguration.getFiles()) {
             for (VirtualFile source : FileUtil.getSourceFilesRec(root, fileBean.getSource())) {
                 VirtualFile baseDir = FileUtil.getBaseDir(source, fileBean.getSource());
                 String sourcePath = source.getName();
@@ -43,9 +43,9 @@ public class ContextLogic {
     }
 
     public static Long findSourceIdFromSourceFile(
-        CrowdinProperties properties, Map<String, FileInfo> filePaths, VirtualFile file, VirtualFile root
+            CrowdinConfiguration crowdinConfiguration, Map<String, FileInfo> filePaths, VirtualFile file, VirtualFile root
     ) {
-        if (properties.isPreserveHierarchy()) {
+        if (crowdinConfiguration.isPreserveHierarchy()) {
             String fileRelativePath = FileUtil.sepAtStart(FileUtil.findRelativePath(root, file));
             FileInfo foundSource = filePaths.get(fileRelativePath);
             return foundSource.getId();

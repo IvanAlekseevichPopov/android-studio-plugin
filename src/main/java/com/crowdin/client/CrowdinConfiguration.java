@@ -3,10 +3,9 @@ package com.crowdin.client;
 import lombok.Data;
 
 import java.util.List;
-import java.util.Map;
 
 @Data
-public class CrowdinProperties {
+public class CrowdinConfiguration {
 
     private Long projectId;
     private String apiToken;

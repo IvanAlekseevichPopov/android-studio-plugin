@@ -1,8 +1,8 @@
 package com.crowdin.logic;
 
 import com.crowdin.client.Crowdin;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
 import com.crowdin.client.RequestBuilder;
 import com.crowdin.client.sourcefiles.model.AddBranchRequest;
 import com.crowdin.client.sourcefiles.model.Branch;
@@ -18,18 +18,18 @@ public class BranchLogic {
 
     private final Crowdin crowdin;
     private final Project project;
-    private final CrowdinProperties properties;
+    private final CrowdinConfiguration crowdinConfiguration;
 
     private String branchName;
 
-    public BranchLogic(Crowdin crowdin, Project project, CrowdinProperties properties) {
+    public BranchLogic(Crowdin crowdin, Project project, CrowdinConfiguration crowdinConfiguration) {
         this.crowdin = crowdin;
         this.project = project;
-        this.properties = properties;
+        this.crowdinConfiguration = crowdinConfiguration;
     }
 
     public String acquireBranchName(boolean performCheck) {
-        String branchName = properties.isDisabledBranches() ? "" : GitUtil.getCurrentBranch(project);
+        String branchName = crowdinConfiguration.isDisabledBranches() ? "" : GitUtil.getCurrentBranch(project);
         if (performCheck) {
             if (!CrowdinFileUtil.isValidBranchName(branchName)) {
                 throw new RuntimeException(MESSAGES_BUNDLE.getString("errors.branch_contains_forbidden_symbols"));

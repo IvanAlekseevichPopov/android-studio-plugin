@@ -2,7 +2,7 @@ package com.crowdin.action;
 
 import com.crowdin.client.Crowdin;
 import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinPropertiesLoader;
 import com.crowdin.client.FileBean;
 import com.crowdin.client.sourcefiles.model.Branch;
@@ -54,19 +54,19 @@ public class DownloadSourcesAction extends BackgroundAction {
             }
             indicator.checkCanceled();
 
-            CrowdinProperties properties;
+            CrowdinConfiguration crowdinConfiguration;
             try {
-                properties = CrowdinPropertiesLoader.load(project);
+                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
             } catch (Exception e) {
                 NotificationUtil.showErrorMessage(project, e.getMessage());
                 return;
             }
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
             indicator.checkCanceled();
 
@@ -79,9 +79,9 @@ public class DownloadSourcesAction extends BackgroundAction {
 
             AtomicBoolean isAnyFileDownloaded = new AtomicBoolean(false);
 
-            for (FileBean fileBean : properties.getFiles()) {
-                Predicate<String> sourcePredicate = FileUtil.filePathRegex(fileBean.getSource(), properties.isPreserveHierarchy());
-                Map<String, VirtualFile> localSourceFiles = (properties.isPreserveHierarchy())
+            for (FileBean fileBean : crowdinConfiguration.getFiles()) {
+                Predicate<String> sourcePredicate = FileUtil.filePathRegex(fileBean.getSource(), crowdinConfiguration.isPreserveHierarchy());
+                Map<String, VirtualFile> localSourceFiles = (crowdinConfiguration.isPreserveHierarchy())
                     ? Collections.emptyMap()
                     : FileUtil.getSourceFilesRec(root, fileBean.getSource()).stream()
                     .collect(Collectors.toMap(VirtualFile::getPath, Function.identity()));
@@ -97,7 +97,7 @@ public class DownloadSourcesAction extends BackgroundAction {
                     return;
                 }
                 for (String foundSourceFilePath : foundSources) {
-                    if (properties.isPreserveHierarchy()) {
+                    if (crowdinConfiguration.isPreserveHierarchy()) {
                         Long fileId = filePaths.get(foundSourceFilePath).getId();
                         this.downloadFile(crowdin, fileId, root, foundSourceFilePath);
                         isAnyFileDownloaded.set(true);

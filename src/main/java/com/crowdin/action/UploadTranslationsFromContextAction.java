@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import static com.crowdin.Constants.MESSAGES_BUNDLE;
@@ -48,10 +46,10 @@ public class UploadTranslationsFromContextAction extends BackgroundAction {
             indicator.checkCanceled();
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
-            CrowdinProperties properties = CrowdinPropertiesLoader.load(project);
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
             indicator.checkCanceled();
 
@@ -68,14 +66,14 @@ public class UploadTranslationsFromContextAction extends BackgroundAction {
             Map<String, File> filePaths = crowdinProjectCache.getFiles(branch);
 
             indicator.checkCanceled();
-            for (FileBean fileBean : properties.getFiles()) {
+            for (FileBean fileBean : crowdinConfiguration.getFiles()) {
                 for (VirtualFile source : FileUtil.getSourceFilesRec(root, fileBean.getSource())) {
                     VirtualFile pathToPattern = FileUtil.getBaseDir(source, fileBean.getSource());
 
-                    String relativePathToPattern = (properties.isPreserveHierarchy())
+                    String relativePathToPattern = (crowdinConfiguration.isPreserveHierarchy())
                         ? java.io.File.separator + FileUtil.findRelativePath(root, pathToPattern)
                         : "";
-                    String patternPathToFile = (properties.isPreserveHierarchy())
+                    String patternPathToFile = (crowdinConfiguration.isPreserveHierarchy())
                         ? java.io.File.separator + FileUtil.findRelativePath(pathToPattern, source.getParent())
                         : "";
 
@@ -125,24 +123,24 @@ public class UploadTranslationsFromContextAction extends BackgroundAction {
             if (file == null) {
                 return;
             }
-            CrowdinProperties properties;
+            CrowdinConfiguration crowdinConfiguration;
             try {
-                properties = CrowdinPropertiesLoader.load(project);
+                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
             } catch (Exception exception) {
                 return;
             }
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            String branchName = ActionUtils.getBranchName(project, properties, false);
+            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, false);
 
             CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
                 CrowdinProjectCacheProvider.getInstance(crowdin, branchName, false);
 
-            isTranslationFile = ContextLogic.findSourceFileFromTranslationFile(file, properties, root, crowdinProjectCache).isPresent();
+            isTranslationFile = ContextLogic.findSourceFileFromTranslationFile(file, crowdinConfiguration, root, crowdinProjectCache).isPresent();
         } catch (Exception exception) {
 //            do nothing
         } finally {

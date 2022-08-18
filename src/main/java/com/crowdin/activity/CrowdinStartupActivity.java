@@ -2,11 +2,10 @@ package com.crowdin.activity;
 
 import com.crowdin.client.Crowdin;
 import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinPropertiesLoader;
 import com.crowdin.event.FileChangeListener;
 import com.crowdin.util.ActionUtils;
-import com.crowdin.util.GitUtil;
 import com.crowdin.util.NotificationUtil;
 import com.crowdin.util.PropertyUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -22,15 +21,15 @@ public class CrowdinStartupActivity implements StartupActivity {
     public void runActivity(@NotNull Project project) {
         try {
             new FileChangeListener(project);
-            CrowdinProperties properties;
+            CrowdinConfiguration crowdinConfiguration;
             if (PropertyUtil.getCrowdinPropertyFile(project) == null) {
                 return;
             }
             //config validation
-            properties = CrowdinPropertiesLoader.load(project);
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            String branchName = ActionUtils.getBranchName(project, properties, false);
+            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, false);
 
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Crowdin") {
                 @Override

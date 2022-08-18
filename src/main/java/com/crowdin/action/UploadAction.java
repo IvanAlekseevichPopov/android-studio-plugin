@@ -40,18 +40,18 @@ public class UploadAction extends BackgroundAction {
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
 
-            CrowdinProperties properties = CrowdinPropertiesLoader.load(project);
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.upload_sources.list_of_patterns")
-                + properties.getFiles().stream()
+                + crowdinConfiguration.getFiles().stream()
                 .map(fileBean -> String.format(MESSAGES_BUNDLE.getString("messages.debug.upload_sources.list_of_patterns_item"), fileBean.getSource(), fileBean.getTranslation()))
                 .collect(Collectors.joining()));
 
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
 
             CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
@@ -61,9 +61,9 @@ public class UploadAction extends BackgroundAction {
             Branch branch = branchLogic.getBranch(crowdinProjectCache, true);
             indicator.checkCanceled();
 
-            Map<FileBean, List<VirtualFile>> sources = properties.getFiles().stream()
+            Map<FileBean, List<VirtualFile>> sources = crowdinConfiguration.getFiles().stream()
                 .collect(Collectors.toMap(Function.identity(), fileBean -> FileUtil.getSourceFilesRec(root, fileBean.getSource())));
-            SourceLogic.processSources(project, root, crowdin, crowdinProjectCache, branch, properties.isPreserveHierarchy(), sources);
+            SourceLogic.processSources(project, root, crowdin, crowdinProjectCache, branch, crowdinConfiguration.isPreserveHierarchy(), sources);
             CrowdinProjectCacheProvider.outdateBranch(branchName);
         } catch (ProcessCanceledException e) {
             throw e;

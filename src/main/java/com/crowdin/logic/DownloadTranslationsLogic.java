@@ -1,10 +1,7 @@
 package com.crowdin.logic;
 
-import com.crowdin.client.Crowdin;
-import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
-import com.crowdin.client.FileBean;
-import com.crowdin.client.RequestBuilder;
+import com.crowdin.client.*;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.languages.model.Language;
 import com.crowdin.client.sourcefiles.model.Branch;
 import com.crowdin.client.translations.model.BuildProjectTranslationRequest;
@@ -39,17 +36,17 @@ public class DownloadTranslationsLogic {
 
     private final Project project;
     private final Crowdin crowdin;
-    private final CrowdinProperties properties;
+    private final CrowdinConfiguration crowdinConfiguration;
     private final VirtualFile root;
     private final CrowdinProjectCacheProvider.CrowdinProjectCache projectCache;
     private final Branch branch;
 
     public DownloadTranslationsLogic(
-        Project project, Crowdin crowdin, CrowdinProperties properties, VirtualFile root, CrowdinProjectCacheProvider.CrowdinProjectCache projectCache, Branch branch
+            Project project, Crowdin crowdin, CrowdinConfiguration crowdinConfiguration, VirtualFile root, CrowdinProjectCacheProvider.CrowdinProjectCache projectCache, Branch branch
     ) {
         this.project = project;
         this.crowdin = crowdin;
-        this.properties = properties;
+        this.crowdinConfiguration = crowdinConfiguration;
         this.root = root;
         this.projectCache = projectCache;
         this.branch = branch;
@@ -116,11 +113,11 @@ public class DownloadTranslationsLogic {
 
     public List<Pair<File, File>> findAllTranslations(String tempDir, List<java.io.File> files) {
         List<Pair<File, File>> targets = new ArrayList<>();
-        for (FileBean fileBean : properties.getFiles()) {
+        for (FileBean fileBean : crowdinConfiguration.getFiles()) {
             for (VirtualFile source : FileUtil.getSourceFilesRec(root, fileBean.getSource())) {
                 VirtualFile pathToPattern = FileUtil.getBaseDir(source, fileBean.getSource());
                 String sourceRelativePath = StringUtils.removeStart(source.getPath(), root.getPath());
-                String relativePathToPattern = (properties.isPreserveHierarchy())
+                String relativePathToPattern = (crowdinConfiguration.isPreserveHierarchy())
                     ? File.separator + FileUtil.findRelativePath(root, pathToPattern)
                     : File.separator;
                 Map<Language, String> translationPaths =

@@ -1,6 +1,6 @@
 package com.crowdin.util;
 
-import com.crowdin.client.CrowdinProperties;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinPropertiesLoader;
 import com.crowdin.client.FileBean;
 import com.crowdin.client.FileBeanBuilder;
@@ -23,7 +23,7 @@ public class PropertyUtilTest {
     @ParameterizedTest
     @MethodSource
     public void testGetSources(Properties properties, List<FileBean> expected) {
-        CrowdinProperties result = CrowdinPropertiesLoader.load(properties);
+        CrowdinConfiguration result = CrowdinPropertiesLoader.load(properties);
         assertEquals("Properties: " + properties, expected, result.getFiles());
     }
 

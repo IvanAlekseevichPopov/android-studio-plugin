@@ -33,7 +33,7 @@ public class UploadTranslationsAction extends BackgroundAction {
         Project project = e.getProject();
         VirtualFile root = FileUtil.getProjectBaseDir(project);
 
-        CrowdinProperties properties;
+        CrowdinConfiguration crowdinConfiguration;
         try {
             CrowdinSettings crowdinSettings = ServiceManager.getService(project, CrowdinSettings.class);
 
@@ -43,14 +43,14 @@ public class UploadTranslationsAction extends BackgroundAction {
             }
             indicator.checkCanceled();
 
-            properties = CrowdinPropertiesLoader.load(project);
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
             indicator.checkCanceled();
 
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
 
             CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
@@ -69,10 +69,10 @@ public class UploadTranslationsAction extends BackgroundAction {
 
             AtomicInteger uploadedFilesCounter = new AtomicInteger(0);
 
-            for (FileBean fileBean : properties.getFiles()) {
+            for (FileBean fileBean : crowdinConfiguration.getFiles()) {
                 for (VirtualFile source : FileUtil.getSourceFilesRec(root, fileBean.getSource())) {
                     VirtualFile pathToPattern = FileUtil.getBaseDir(source, fileBean.getSource());
-                    String sourceRelativePath = properties.isPreserveHierarchy() ? StringUtils.removeStart(source.getPath(), root.getPath()) : FileUtil.sepAtStart(source.getName());
+                    String sourceRelativePath = crowdinConfiguration.isPreserveHierarchy() ? StringUtils.removeStart(source.getPath(), root.getPath()) : FileUtil.sepAtStart(source.getName());
 
                     Map<Language, String> translationPaths =
                         PlaceholderUtil.buildTranslationPatterns(sourceRelativePath, fileBean.getTranslation(), crowdinProjectCache.getProjectLanguages(), crowdinProjectCache.getLanguageMapping());

@@ -1,8 +1,8 @@
 package com.crowdin.action;
 
 import com.crowdin.client.Crowdin;
+import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinProperties;
 import com.crowdin.client.CrowdinPropertiesLoader;
 import com.crowdin.client.sourcefiles.model.Branch;
 import com.crowdin.logic.BranchLogic;
@@ -34,19 +34,19 @@ public class DownloadAction extends BackgroundAction {
             }
             indicator.checkCanceled();
 
-            CrowdinProperties properties;
+            CrowdinConfiguration crowdinConfiguration;
             try {
-                properties = CrowdinPropertiesLoader.load(project);
+                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
             } catch (Exception e) {
                 NotificationUtil.showErrorMessage(project, e.getMessage());
                 return;
             }
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
             indicator.checkCanceled();
 
@@ -60,7 +60,7 @@ public class DownloadAction extends BackgroundAction {
 
             Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
 
-            (new DownloadTranslationsLogic(project, crowdin, properties, root, crowdinProjectCache, branch)).process();
+            (new DownloadTranslationsLogic(project, crowdin, crowdinConfiguration, root, crowdinProjectCache, branch)).process();
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (Exception e) {

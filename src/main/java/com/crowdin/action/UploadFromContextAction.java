@@ -18,7 +18,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import static com.crowdin.Constants.MESSAGES_BUNDLE;
 
@@ -41,12 +40,12 @@ public class UploadFromContextAction extends BackgroundAction {
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
 
-            CrowdinProperties properties = CrowdinPropertiesLoader.load(project);
-            NotificationUtil.setLogDebugLevel(properties.isDebug());
+            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, properties.getProjectId(), properties.getApiToken(), properties.getBaseUrl());
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, properties);
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
+            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
             String branchName = branchLogic.acquireBranchName(true);
             indicator.checkCanceled();
 
@@ -56,7 +55,7 @@ public class UploadFromContextAction extends BackgroundAction {
             Branch branch = branchLogic.getBranch(crowdinProjectCache, true);
             indicator.checkCanceled();
 
-            FileBean foundFileBean = properties.getFiles()
+            FileBean foundFileBean = crowdinConfiguration.getFiles()
                 .stream()
                 .filter(fb -> FileUtil.getSourceFilesRec(root, fb.getSource()).contains(file))
                 .findAny()
@@ -65,7 +64,7 @@ public class UploadFromContextAction extends BackgroundAction {
             indicator.checkCanceled();
 
             Map<FileBean, List<VirtualFile>> source = Collections.singletonMap(foundFileBean, Collections.singletonList(file));
-            SourceLogic.processSources(project, root, crowdin, crowdinProjectCache, branch, properties.isPreserveHierarchy(), source);
+            SourceLogic.processSources(project, root, crowdin, crowdinProjectCache, branch, crowdinConfiguration.isPreserveHierarchy(), source);
 
             CrowdinProjectCacheProvider.outdateBranch(branchName);
         } catch (ProcessCanceledException e) {
@@ -82,9 +81,9 @@ public class UploadFromContextAction extends BackgroundAction {
         final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(e.getDataContext());
         boolean isSourceFile = false;
         try {
-            CrowdinProperties properties;
-            properties = CrowdinPropertiesLoader.load(project);
-            isSourceFile = properties.getFiles()
+            CrowdinConfiguration crowdinConfiguration;
+            crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            isSourceFile = crowdinConfiguration.getFiles()
                 .stream()
                 .flatMap(fb -> FileUtil.getSourceFilesRec(FileUtil.getProjectBaseDir(project), fb.getSource()).stream())
                 .anyMatch(f -> Objects.equals(file, f));
