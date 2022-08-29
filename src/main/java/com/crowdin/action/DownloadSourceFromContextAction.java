@@ -21,7 +21,9 @@ import com.intellij.openapi.vfs.VirtualFile;
 import lombok.NonNull;
 
 import java.net.URL;
+import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.crowdin.Constants.MESSAGES_BUNDLE;
 
@@ -46,13 +48,17 @@ public class DownloadSourceFromContextAction extends BackgroundAction {
 
             CrowdinConfiguration crowdinConfiguration;
             try {
-                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+                crowdinConfiguration = getConfigurationByFile(project, file);
+                if(crowdinConfiguration == null) {
+                    NotificationUtil.logDebugMessage(project, "empty configuration");
+                    return;
+                }
             } catch (Exception e) {
                 NotificationUtil.showErrorMessage(project, e.getMessage());
                 return;
             }
             NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
-            NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
+            NotificationUtil.logDebugMessage(project, crowdinConfiguration.getConfigurationName(), MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
             Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
             BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
@@ -61,7 +67,7 @@ public class DownloadSourceFromContextAction extends BackgroundAction {
             indicator.checkCanceled();
 
             CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                CrowdinProjectCacheProvider.getInstance(crowdin, branchName, true);
+                CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, true);
 
             Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
 
@@ -84,24 +90,42 @@ public class DownloadSourceFromContextAction extends BackgroundAction {
             return;
         }
         final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(e.getDataContext());
-        boolean isSourceFile = false;
-        try {
-            CrowdinConfiguration properties = CrowdinPropertiesLoader.load(project);
-            isSourceFile = properties.getFiles()
-                .stream()
-                .flatMap(fb -> FileUtil.getSourceFilesRec(FileUtil.getProjectBaseDir(project), fb.getSource()).stream())
-                .anyMatch(f -> Objects.equals(file, f));
-        } catch (Exception exception) {
-//            do nothing
-        } finally {
-            e.getPresentation().setEnabled(isSourceFile);
-            e.getPresentation().setVisible(isSourceFile);
-        }
+
+        boolean isSourceFile = isSourceFile(project, file);
+
+        e.getPresentation().setEnabled(isSourceFile);
+        e.getPresentation().setVisible(isSourceFile);
     }
 
     @Override
     protected String loadingText(AnActionEvent e) {
         VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(e.getDataContext());
         return String.format(MESSAGES_BUNDLE.getString("labels.loading_text.download_source_file_from_context"), (file != null ? file.getName() : "<UNKNOWN>"));
+    }
+
+    private CrowdinConfiguration getConfigurationByFile(Project project, VirtualFile file) {
+        CrowdinConfiguration[] crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
+        CrowdinConfiguration selectedConfig = null;
+        try {
+            selectedConfig = Arrays.stream(crowdinConfigurations)
+                    .filter(
+                            c -> c.getFiles()
+                                    .stream()
+                                    .flatMap(fb -> FileUtil.getSourceFilesRec(FileUtil.getProjectBaseDir(project), fb.getSource()).stream())
+                                    .anyMatch(f -> Objects.equals(file, f))
+                    )
+                    .findFirst()
+                    .orElse(null);
+
+        } catch (Exception exception) {
+            NotificationUtil.logDebugMessage(project, exception.getMessage());
+        }
+
+        return selectedConfig;
+    }
+
+    private boolean isSourceFile(Project project, VirtualFile file) {
+        CrowdinConfiguration configuration = getConfigurationByFile(project, file);
+        return configuration != null;
     }
 }
