@@ -1,10 +1,12 @@
 package com.crowdin.client;
 
 import com.crowdin.util.FileUtil;
+import com.crowdin.util.NotificationUtil;
 import com.crowdin.util.PropertyUtil;
 import com.crowdin.util.Util;
 import com.intellij.openapi.project.Project;
 import org.apache.commons.lang.StringUtils;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,7 +15,24 @@ import static com.crowdin.Constants.*;
 
 public class CrowdinPropertiesLoader {
 
+    public static @NotNull CrowdinConfiguration[] loadAll(Project project) {
+        Properties[] propertiesCollection = PropertyUtil.getPropertiesCollection(project);
+        if (propertiesCollection == null) {
+            NotificationUtil.showErrorMessage(project, "No configurations was found");
+            return new CrowdinConfiguration[0];
+        }
 
+        CrowdinConfiguration[] crowdinProperties = new CrowdinConfiguration[propertiesCollection.length];
+        int i = 0;
+        for (Properties properties : propertiesCollection) {
+            crowdinProperties[i++] = load(properties);
+        }
+
+        return crowdinProperties;
+    }
+
+    /** @deprecated use {@link #loadAll(Project)} */
+    @Deprecated
     public static CrowdinConfiguration load(Project project) {
         Properties properties = PropertyUtil.getProperties(project);
         return CrowdinPropertiesLoader.load(properties);
@@ -22,93 +41,93 @@ public class CrowdinPropertiesLoader {
     public static CrowdinConfiguration load(Properties properties) {
         List<String> errors = new ArrayList<>();
         List<String> notExistEnvVars = new ArrayList<>();
-        CrowdinConfiguration crowdinConfiguration = new CrowdinConfiguration();
+
         if (properties == null) {
             errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.missing_config_file"), PROPERTIES_FILE));
-        } else {
-            String propProjectId = properties.getProperty(PROJECT_ID);
-            String propProjectIdEnv = properties.getProperty(PROJECT_ID_ENV);
-            if (StringUtils.isNotEmpty(propProjectId)) {
-                try {
-                    crowdinConfiguration.setProjectId(Long.valueOf(propProjectId));
-                } catch (NumberFormatException e) {
-                    errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.property_is_not_number"), PROJECT_ID));
-                }
-            } else if (StringUtils.isNotEmpty(propProjectIdEnv)) {
-                String propProjectIdEnvValue = System.getenv(propProjectIdEnv);
-                if (propProjectIdEnvValue == null) {
-                    notExistEnvVars.add(propProjectIdEnv);
-                } else {
-                    try {
-                        crowdinConfiguration.setProjectId(Long.valueOf(propProjectIdEnvValue));
-                    } catch (NumberFormatException e) {
-                        errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.env_property_is_not_number"), propProjectIdEnv));
-                    }
-                }
-            } else {
-                errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.missing_property"), PROJECT_ID));
-            }
-            String propApiToken = properties.getProperty(API_TOKEN);
-            String propApiTokenEnv = properties.getProperty(API_TOKEN_ENV);
-            if (StringUtils.isNotEmpty(propApiToken)) {
-                crowdinConfiguration.setApiToken(propApiToken);
-            } else if (StringUtils.isNotEmpty(propApiTokenEnv)) {
-                String propApiTokenEnvValue = System.getenv(propApiTokenEnv);
-                if (propApiTokenEnvValue != null) {
-                    crowdinConfiguration.setApiToken(propApiTokenEnvValue);
-                } else {
-                    notExistEnvVars.add(propApiTokenEnv);
-                }
-            } else {
-                errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.missing_property"), API_TOKEN));
-            }
-            String propBaseUrl = properties.getProperty(BASE_URL);
-            String propBaseUrlEnv = properties.getProperty(BASE_URL_ENV);
-            if (StringUtils.isNotEmpty(propBaseUrl)) {
-                if (isBaseUrlValid(propBaseUrl)) {
-                    crowdinConfiguration.setBaseUrl(propBaseUrl);
-                } else {
-                    errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.invalid_url_property"), BASE_URL));
-                }
-            } else if (StringUtils.isNotEmpty(propBaseUrlEnv)) {
-                String propBaseUrlEnvValue = System.getenv(propBaseUrlEnv);
-                if (propBaseUrlEnvValue == null) {
-                    notExistEnvVars.add(propBaseUrlEnv);
-                } else if (!isBaseUrlValid(propBaseUrlEnvValue)) {
-                    errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.invalid_url_env"), propBaseUrlEnv, propBaseUrlEnvValue));
-                } else {
-                    crowdinConfiguration.setBaseUrl(propBaseUrlEnvValue);
-                }
-            }
-            if (notExistEnvVars.size() == 1) {
-                errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.sysenv_not_exist.single"), notExistEnvVars.get(0)));
-            } else if (!notExistEnvVars.isEmpty()) {
-                errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.sysenv_not_exist.plural"), StringUtils.join(notExistEnvVars, ", ")));
-            }
-            String disabledBranches = properties.getProperty(PROPERTY_DISABLE_BRANCHES);
-            if (disabledBranches != null) {
-                crowdinConfiguration.setDisabledBranches(Boolean.parseBoolean(disabledBranches));
-            } else {
-                crowdinConfiguration.setDisabledBranches(DISABLE_BRANCHES_DEFAULT);
-            }
-            String preserveHierarchy = properties.getProperty(PROPERTY_PRESERVE_HIERARCHY);
-            if (preserveHierarchy != null) {
-                crowdinConfiguration.setPreserveHierarchy(Boolean.parseBoolean(preserveHierarchy));
-            } else {
-                crowdinConfiguration.setPreserveHierarchy(PRESERVE_HIERARCHY_DEFAULT);
-            }
-            String debug = properties.getProperty(PROPERTY_DEBUG);
-            if (debug != null) {
-                crowdinConfiguration.setDebug(Boolean.parseBoolean(debug));
-            } else {
-                crowdinConfiguration.setDebug(false);
-            }
-            crowdinConfiguration.setFiles(getFileBeans(properties, errors));
-        }
 
-        if (!errors.isEmpty()) {
             throw new RuntimeException(Util.prepareListMessageText(MESSAGES_BUNDLE.getString("errors.config.has_errors"), errors));
         }
+
+        CrowdinConfiguration crowdinConfiguration = new CrowdinConfiguration();
+        crowdinConfiguration.setConfigurationName(properties.getProperty(CONFIG_NAME));
+        String propProjectId = properties.getProperty(PROJECT_ID);
+        String propProjectIdEnv = properties.getProperty(PROJECT_ID_ENV);
+        if (StringUtils.isNotEmpty(propProjectId)) {
+            try {
+                crowdinConfiguration.setProjectId(Long.valueOf(propProjectId));
+            } catch (NumberFormatException e) {
+                errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.property_is_not_number"), PROJECT_ID));
+            }
+        } else if (StringUtils.isNotEmpty(propProjectIdEnv)) {
+            String propProjectIdEnvValue = System.getenv(propProjectIdEnv);
+            if (propProjectIdEnvValue == null) {
+                notExistEnvVars.add(propProjectIdEnv);
+            } else {
+                try {
+                    crowdinConfiguration.setProjectId(Long.valueOf(propProjectIdEnvValue));
+                } catch (NumberFormatException e) {
+                    errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.env_property_is_not_number"), propProjectIdEnv));
+                }
+            }
+        } else {
+            errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.missing_property"), PROJECT_ID));
+        }
+        String propApiToken = properties.getProperty(API_TOKEN);
+        String propApiTokenEnv = properties.getProperty(API_TOKEN_ENV);
+        if (StringUtils.isNotEmpty(propApiToken)) {
+            crowdinConfiguration.setApiToken(propApiToken);
+        } else if (StringUtils.isNotEmpty(propApiTokenEnv)) {
+            String propApiTokenEnvValue = System.getenv(propApiTokenEnv);
+            if (propApiTokenEnvValue != null) {
+                crowdinConfiguration.setApiToken(propApiTokenEnvValue);
+            } else {
+                notExistEnvVars.add(propApiTokenEnv);
+            }
+        } else {
+            errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.missing_property"), API_TOKEN));
+        }
+        String propBaseUrl = properties.getProperty(BASE_URL);
+        String propBaseUrlEnv = properties.getProperty(BASE_URL_ENV);
+        if (StringUtils.isNotEmpty(propBaseUrl)) {
+            if (isBaseUrlValid(propBaseUrl)) {
+                crowdinConfiguration.setBaseUrl(propBaseUrl);
+            } else {
+                errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.invalid_url_property"), BASE_URL));
+            }
+        } else if (StringUtils.isNotEmpty(propBaseUrlEnv)) {
+            String propBaseUrlEnvValue = System.getenv(propBaseUrlEnv);
+            if (propBaseUrlEnvValue == null) {
+                notExistEnvVars.add(propBaseUrlEnv);
+            } else if (!isBaseUrlValid(propBaseUrlEnvValue)) {
+                errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.invalid_url_env"), propBaseUrlEnv, propBaseUrlEnvValue));
+            } else {
+                crowdinConfiguration.setBaseUrl(propBaseUrlEnvValue);
+            }
+        }
+        if (notExistEnvVars.size() == 1) {
+            errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.sysenv_not_exist.single"), notExistEnvVars.get(0)));
+        } else if (!notExistEnvVars.isEmpty()) {
+            errors.add(String.format(MESSAGES_BUNDLE.getString("errors.config.sysenv_not_exist.plural"), StringUtils.join(notExistEnvVars, ", ")));
+        }
+        String disabledBranches = properties.getProperty(PROPERTY_DISABLE_BRANCHES);
+        if (disabledBranches != null) {
+            crowdinConfiguration.setDisabledBranches(Boolean.parseBoolean(disabledBranches));
+        } else {
+            crowdinConfiguration.setDisabledBranches(DISABLE_BRANCHES_DEFAULT);
+        }
+        String preserveHierarchy = properties.getProperty(PROPERTY_PRESERVE_HIERARCHY);
+        if (preserveHierarchy != null) {
+            crowdinConfiguration.setPreserveHierarchy(Boolean.parseBoolean(preserveHierarchy));
+        } else {
+            crowdinConfiguration.setPreserveHierarchy(PRESERVE_HIERARCHY_DEFAULT);
+        }
+        String debug = properties.getProperty(PROPERTY_DEBUG);
+        if (debug != null) {
+            crowdinConfiguration.setDebug(Boolean.parseBoolean(debug));
+        } else {
+            crowdinConfiguration.setDebug(false);
+        }
+        crowdinConfiguration.setFiles(getFileBeans(properties, errors));
 
         return crowdinConfiguration;
     }

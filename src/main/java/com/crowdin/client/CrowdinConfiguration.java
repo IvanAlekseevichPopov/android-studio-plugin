@@ -8,6 +8,7 @@ import java.util.List;
 public class CrowdinConfiguration {
 
     private Long projectId;
+    private String configurationName;
     private String apiToken;
     private String baseUrl;
     private boolean disabledBranches;

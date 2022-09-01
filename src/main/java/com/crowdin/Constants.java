@@ -12,8 +12,11 @@ public final class Constants {
     public static final String STANDARD_SOURCE_FILE_PATH = STANDARD_SOURCE_PATH + STANDARD_SOURCE_NAME;
 
     public static final String PROPERTIES_FILE = "crowdin.properties";
+    public static final String PROPERTIES_FILE_PATTERN = "crowdin\\.(.{1,}\\.)*properties";
 
     public static final String PROJECT_ID = "project-id";
+
+    public static final String CONFIG_NAME = "configuration-name";
     public static final String PROJECT_ID_ENV = "project-id-env";
     public static final String API_TOKEN = "api-token";
     public static final String API_TOKEN_ENV = "api-token-env";

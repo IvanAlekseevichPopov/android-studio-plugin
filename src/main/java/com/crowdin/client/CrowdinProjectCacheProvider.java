@@ -18,7 +18,7 @@ import java.util.Map;
 
 public class CrowdinProjectCacheProvider {
 
-    private static CrowdinProjectCache crowdinProjectCache;
+    private static HashMap<String, CrowdinProjectCache> crowdinProjectCacheByConfiguration = new HashMap<>();
 
     private static boolean outdated = false;
     private static List<String> outdatedBranches = new ArrayList<>();
@@ -91,10 +91,10 @@ public class CrowdinProjectCacheProvider {
 
     }
 
-    public synchronized static CrowdinProjectCache getInstance(Crowdin crowdin, String branchName, boolean update) {
-        if (crowdinProjectCache == null) {
-            crowdinProjectCache = new CrowdinProjectCache();
-        }
+    public synchronized static CrowdinProjectCache getInstance(Crowdin crowdin, String configurationName, String branchName, boolean update) {
+        crowdinProjectCacheByConfiguration.putIfAbsent(configurationName, new CrowdinProjectCache());
+        CrowdinProjectCache crowdinProjectCache = crowdinProjectCacheByConfiguration.get(configurationName);
+
         if (crowdinProjectCache.getProject() == null || update) {
             crowdinProjectCache.setProject(crowdin.getProject());
             crowdinProjectCache.setManagerAccess(crowdinProjectCache.getProject() instanceof ProjectSettings);
