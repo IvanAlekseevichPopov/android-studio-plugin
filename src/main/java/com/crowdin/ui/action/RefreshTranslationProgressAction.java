@@ -55,7 +55,6 @@ public class RefreshTranslationProgressAction extends BackgroundAction {
 
     @Override
     protected void performInBackground(@NonNull AnActionEvent e, @NonNull ProgressIndicator indicator) {
-        System.out.println("e.getProject() = " + e.getProject());
         Project project = e.getProject();
         e.getPresentation().setEnabled(false);
         isInProgress.set(true);
@@ -68,54 +67,56 @@ public class RefreshTranslationProgressAction extends BackgroundAction {
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
 
-            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.load(project);
-            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
+            CrowdinConfiguration[] crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
+            for (CrowdinConfiguration crowdinConfiguration : crowdinConfigurations) {
+                Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
-            NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
+                NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
+                NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, true);
+                String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, true);
 
-            CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                CrowdinProjectCacheProvider.getInstance(crowdin, branchName, true);
-            Branch branch = crowdinProjectCache.getBranches().get(branchName);
+                CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
+                        CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, true);
+                Branch branch = crowdinProjectCache.getBranches().get(branchName);
 
-            Map<LanguageProgress, List<FileProgress>> progress = crowdin.getProjectProgress()
-                .parallelStream()
-                .collect(Collectors.toMap(Function.identity(), langProgress -> crowdin.getLanguageProgress(langProgress.getLanguageId())));
-
-
-            List<String> crowdinFilePaths = crowdinConfiguration.getFiles().stream()
-                .flatMap((fileBean) -> {
-                    List<VirtualFile> sourceFiles = FileUtil.getSourceFilesRec(root, fileBean.getSource());
-                    return sourceFiles.stream().map(sourceFile -> {
-                        if (crowdinConfiguration.isPreserveHierarchy()) {
-                            VirtualFile pathToPattern = FileUtil.getBaseDir(sourceFile, fileBean.getSource());
-
-                            String relativePathToPattern = FileUtil.findRelativePath(FileUtil.getProjectBaseDir(project), pathToPattern);
-                            String patternPathToFile = FileUtil.findRelativePath(pathToPattern, sourceFile.getParent());
-
-                            return  unixPath(sepAtStart(normalizePath(joinPaths(relativePathToPattern, patternPathToFile, sourceFile.getName()))));
-                        } else {
-                            return unixPath(sepAtStart(sourceFile.getName()));
-                        }
-                    });
-                })
-                .collect(Collectors.toList());
+                Map<LanguageProgress, List<FileProgress>> progress = crowdin.getProjectProgress()
+                        .parallelStream()
+                        .collect(Collectors.toMap(Function.identity(), langProgress -> crowdin.getLanguageProgress(langProgress.getLanguageId())));
 
 
-            Map<Long, String> fileNames = crowdinProjectCache.getFileInfos(branch).values()
-                .stream()
-                .filter((fileInfo) -> crowdinFilePaths.contains(removeBranchNameInPath(fileInfo.getPath(), branchName)))
-                .collect(Collectors.toMap(FileInfo::getId, file -> removeBranchNameInPath(file.getPath(), branchName)));
-            Map<String, String> languageNames = crowdinProjectCache.getProjectLanguages()
-                .stream()
-                .collect(Collectors.toMap(Language::getId, Language::getName));
+                List<String> crowdinFilePaths = crowdinConfiguration.getFiles().stream()
+                        .flatMap((fileBean) -> {
+                            List<VirtualFile> sourceFiles = FileUtil.getSourceFilesRec(root, fileBean.getSource());
+                            return sourceFiles.stream().map(sourceFile -> {
+                                if (crowdinConfiguration.isPreserveHierarchy()) {
+                                    VirtualFile pathToPattern = FileUtil.getBaseDir(sourceFile, fileBean.getSource());
 
-            ApplicationManager.getApplication().invokeAndWait(() -> {
-                window.setData(crowdinProjectCache.getProject().getName(), progress, fileNames, languageNames);
-                window.rebuildTree();
-            });
+                                    String relativePathToPattern = FileUtil.findRelativePath(FileUtil.getProjectBaseDir(project), pathToPattern);
+                                    String patternPathToFile = FileUtil.findRelativePath(pathToPattern, sourceFile.getParent());
+
+                                    return  unixPath(sepAtStart(normalizePath(joinPaths(relativePathToPattern, patternPathToFile, sourceFile.getName()))));
+                                } else {
+                                    return unixPath(sepAtStart(sourceFile.getName()));
+                                }
+                            });
+                        })
+                        .collect(Collectors.toList());
+
+
+                Map<Long, String> fileNames = crowdinProjectCache.getFileInfos(branch).values()
+                        .stream()
+                        .filter((fileInfo) -> crowdinFilePaths.contains(removeBranchNameInPath(fileInfo.getPath(), branchName)))
+                        .collect(Collectors.toMap(FileInfo::getId, file -> removeBranchNameInPath(file.getPath(), branchName)));
+                Map<String, String> languageNames = crowdinProjectCache.getProjectLanguages()
+                        .stream()
+                        .collect(Collectors.toMap(Language::getId, Language::getName));
+
+                ApplicationManager.getApplication().invokeAndWait(() -> {
+                    window.setData(crowdinProjectCache.getProject().getName(), progress, fileNames, languageNames);
+                    window.rebuildTree();
+                });
+            }
         } catch (ProcessCanceledException ex) {
             throw ex;
         } catch (Exception ex) {
