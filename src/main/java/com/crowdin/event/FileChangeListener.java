@@ -46,7 +46,7 @@ public class FileChangeListener implements Disposable, BulkFileListener {
 //        do nothing
     }
 
-    public void after(List<? extends VFileEvent> events) {
+    public void after(@NotNull List<? extends VFileEvent> events) {
         if (this.project.isDisposed()) {
             return;
         }
@@ -54,7 +54,24 @@ public class FileChangeListener implements Disposable, BulkFileListener {
         List<? extends VFileEvent> interestedFiles = events.stream()
                 .filter(f -> f.getFile() != null && instance.isInContent(f.getFile()))
                 .collect(Collectors.toList());
-        if (interestedFiles.size() == 0 || this.autoUploadOff()) {
+
+        CrowdinConfiguration[] crowdinConfigurations;
+        try {
+            crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
+        } catch (Exception e) {
+            return;
+        }
+        for (CrowdinConfiguration crowdinConfiguration : crowdinConfigurations) {
+            processOneConfiguration(events, interestedFiles, crowdinConfiguration);
+        }
+    }
+
+    private void processOneConfiguration(
+            List<? extends VFileEvent> events,
+            List<? extends VFileEvent> interestedFiles,
+            CrowdinConfiguration crowdinConfiguration
+    ) {
+        if (interestedFiles.size() == 0 || this.autoUploadOff(crowdinConfiguration.getConfigurationName())) {
             return;
         }
 
@@ -62,12 +79,6 @@ public class FileChangeListener implements Disposable, BulkFileListener {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
-                    CrowdinConfiguration crowdinConfiguration;
-                    try {
-                        crowdinConfiguration = CrowdinPropertiesLoader.load(project);
-                    } catch (Exception e) {
-                        return;
-                    }
                     indicator.checkCanceled();
                     Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
@@ -75,7 +86,7 @@ public class FileChangeListener implements Disposable, BulkFileListener {
                     String branchName = branchLogic.acquireBranchName(true);
 
                     CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                        CrowdinProjectCacheProvider.getInstance(crowdin, branchName, false);
+                            CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, false);
                     indicator.checkCanceled();
 
                     Map<FileBean, List<VirtualFile>> allSources = new HashMap<>();
@@ -123,9 +134,10 @@ public class FileChangeListener implements Disposable, BulkFileListener {
         });
     }
 
-    private boolean autoUploadOff() {
-        String autoUploadProp = PropertyUtil.getPropertyValue(PROPERTY_AUTO_UPLOAD, this.project);
-        return PropertyUtil.getCrowdinPropertyFile(this.project) == null || (autoUploadProp != null && autoUploadProp.equals("false"));
+    private boolean autoUploadOff(String configurationName) {
+        String autoUploadProp = PropertyUtil.getPropertyValue(PROPERTY_AUTO_UPLOAD, this.project, configurationName);
+
+        return autoUploadProp != null && autoUploadProp.equals("false");
     }
 
     @Override

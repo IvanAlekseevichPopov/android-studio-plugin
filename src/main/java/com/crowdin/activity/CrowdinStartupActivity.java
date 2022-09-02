@@ -6,6 +6,7 @@ import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.CrowdinPropertiesLoader;
 import com.crowdin.event.FileChangeListener;
 import com.crowdin.util.ActionUtils;
+import com.crowdin.util.GitUtil;
 import com.crowdin.util.NotificationUtil;
 import com.crowdin.util.PropertyUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -21,24 +22,28 @@ public class CrowdinStartupActivity implements StartupActivity {
     public void runActivity(@NotNull Project project) {
         try {
             new FileChangeListener(project);
-            CrowdinConfiguration crowdinConfiguration;
-            if (PropertyUtil.getCrowdinPropertyFile(project) == null) {
+            if (!PropertyUtil.isPropertyFilesExist(project) ) {
                 return;
             }
             //config validation
-            crowdinConfiguration = CrowdinPropertiesLoader.load(project);
-            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
-
-            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, false);
+            CrowdinConfiguration[] configurationsCollection = CrowdinPropertiesLoader.loadAll(project);
+            if(configurationsCollection.length == 0) {
+                return;
+            }
 
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "Crowdin") {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
-                    try {
-                        indicator.setText("Updating Crowdin cache");
-                        CrowdinProjectCacheProvider.getInstance(crowdin, branchName, true);
-                    } catch (Exception e) {
-                        NotificationUtil.showErrorMessage(project, e.getMessage());
+                    for (CrowdinConfiguration crowdinConfiguration : configurationsCollection) {
+                        try {
+                            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
+                            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, false);
+
+                            indicator.setText("Updating Crowdin cache for configuration: " + crowdinConfiguration.getConfigurationName());
+                            CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, true);
+                        } catch (Exception e) {
+                            NotificationUtil.showErrorMessage(project, e.getMessage());
+                        }
                     }
                 }
             });

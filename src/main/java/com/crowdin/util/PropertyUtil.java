@@ -1,8 +1,10 @@
 package com.crowdin.util;
 
 import com.crowdin.Constants;
+import com.crowdin.client.CrowdinConfiguration;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -14,11 +16,11 @@ import static com.crowdin.Constants.PROPERTIES_FILE_PATTERN;
 
 public class PropertyUtil {
 
-    public static String getPropertyValue(String key, Project project) {
+    public static String getPropertyValue(String key, Project project, @NotNull String configurationName) {
         if (key == null) {
             return "";
         }
-        Properties properties = getProperties(project);
+        Properties properties = getPropertiesByConfiguration(project, configurationName);
         if (properties != null && properties.get(key) != null) {
             return properties.get(key).toString();
         } else {
@@ -26,10 +28,21 @@ public class PropertyUtil {
         }
     }
 
-    public static Properties[] getPropertiesCollection(Project project) {
+    private static Properties getPropertiesByConfiguration(Project project, String configurationName) {
+        Properties[] propertiesCollection = getPropertiesCollection(project);
+        for (Properties properties : propertiesCollection) {
+            if(properties.get(Constants.CONFIG_NAME).equals(configurationName)) {
+                return properties;
+            }
+        }
+
+        return null;
+    }
+
+    public static @NotNull Properties[] getPropertiesCollection(Project project) {
         ArrayList<VirtualFile> propertiesFiles = getCrowdinPropertyFiles(project);
         if (propertiesFiles == null) {
-            return null;
+            return new Properties[0];
         }
 
         Properties[] propertiesCollection = new Properties[propertiesFiles.size()];

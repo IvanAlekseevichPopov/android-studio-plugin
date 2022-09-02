@@ -59,6 +59,12 @@ public final class NotificationUtil {
         logMessage(project, message, NotificationType.INFORMATION, "DEBUG");
     }
 
+    public static void logDebugMessage(@NotNull Project project, @NotNull String configurationName, @NotNull String message) {
+        String formattedMessage = String.format("%s DEBUG: %s(%s)", logDateFormat.format(new Date()), message, configurationName);
+
+        logMessage(project, formattedMessage, NotificationType.INFORMATION);
+    }
+
     public static void logErrorMessage(@NotNull Project project, @NotNull Exception e) {
         Throwable rootCause = ExceptionUtils.getRootCause(e);
         logMessage(project, ExceptionUtils.getStackTrace((rootCause != null) ? rootCause : e), NotificationType.ERROR, "ERROR");
@@ -67,6 +73,15 @@ public final class NotificationUtil {
     private static void logMessage(@NotNull Project project, @NotNull String message, @NotNull NotificationType type, String level) {
         if (isDebug) {
             String formattedMessage = String.format("%s %s : %s", logDateFormat.format(new Date()), level, message);
+            ApplicationManager.getApplication().invokeLater(() -> {
+                Notification notification = GROUP_DISPLAY_ID_INFO_LOG.createNotification(TITLE, formattedMessage, type, null);
+                Notifications.Bus.notify(notification, project);
+            });
+        }
+    }
+
+    private static void logMessage(@NotNull Project project, @NotNull String formattedMessage, @NotNull NotificationType type) {
+        if (isDebug) {
             ApplicationManager.getApplication().invokeLater(() -> {
                 Notification notification = GROUP_DISPLAY_ID_INFO_LOG.createNotification(TITLE, formattedMessage, type, null);
                 Notifications.Bus.notify(notification, project);
