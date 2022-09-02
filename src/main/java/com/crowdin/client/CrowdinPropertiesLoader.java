@@ -5,6 +5,7 @@ import com.crowdin.util.NotificationUtil;
 import com.crowdin.util.PropertyUtil;
 import com.crowdin.util.Util;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -14,6 +15,31 @@ import java.util.stream.Collectors;
 import static com.crowdin.Constants.*;
 
 public class CrowdinPropertiesLoader {
+    public static CrowdinConfiguration getConfigurationBySourceFile(Project project, VirtualFile file) {
+        CrowdinConfiguration[] crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
+        CrowdinConfiguration selectedConfig = null;
+        try {
+            selectedConfig = Arrays.stream(crowdinConfigurations)
+                    .filter(
+                            c -> c.getFiles()
+                                    .stream()
+                                    .flatMap(fb -> FileUtil.getSourceFilesRec(FileUtil.getProjectBaseDir(project), fb.getSource()).stream())
+                                    .anyMatch(f -> Objects.equals(file, f))
+                    )
+                    .findFirst()
+                    .orElse(null);
+
+        } catch (Exception exception) {
+            NotificationUtil.logDebugMessage(project, exception.getMessage());
+        }
+
+        return selectedConfig;
+    }
+
+    public static boolean isSourceFile(Project project, VirtualFile file) {
+        CrowdinConfiguration configuration = getConfigurationBySourceFile(project, file);
+        return configuration != null;
+    }
 
     public static @NotNull CrowdinConfiguration[] loadAll(Project project) {
         Properties[] propertiesCollection = PropertyUtil.getPropertiesCollection(project);

@@ -17,14 +17,13 @@ import com.intellij.openapi.vfs.VirtualFile;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import static com.crowdin.Constants.MESSAGES_BUNDLE;
 
 /**
  * Created by ihor on 1/27/17.
  */
-public class UploadFromContextAction extends BackgroundAction {
+public class UploadSourceFromContextAction extends BackgroundAction {
     @Override
     public void performInBackground(AnActionEvent anActionEvent, ProgressIndicator indicator) {
         final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(anActionEvent.getDataContext());
@@ -40,7 +39,7 @@ public class UploadFromContextAction extends BackgroundAction {
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
 
-            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.getConfigurationBySourceFile(project, file);
             NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
             NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
@@ -50,7 +49,7 @@ public class UploadFromContextAction extends BackgroundAction {
             indicator.checkCanceled();
 
             CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                CrowdinProjectCacheProvider.getInstance(crowdin, branchName, true);
+                CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, true);
 
             Branch branch = branchLogic.getBranch(crowdinProjectCache, true);
             indicator.checkCanceled();
@@ -78,21 +77,14 @@ public class UploadFromContextAction extends BackgroundAction {
     @Override
     public void update(AnActionEvent e) {
         Project project = e.getProject();
-        final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(e.getDataContext());
-        boolean isSourceFile = false;
-        try {
-            CrowdinConfiguration crowdinConfiguration;
-            crowdinConfiguration = CrowdinPropertiesLoader.load(project);
-            isSourceFile = crowdinConfiguration.getFiles()
-                .stream()
-                .flatMap(fb -> FileUtil.getSourceFilesRec(FileUtil.getProjectBaseDir(project), fb.getSource()).stream())
-                .anyMatch(f -> Objects.equals(file, f));
-        } catch (Exception exception) {
-//            do nothing
-        } finally {
-            e.getPresentation().setEnabled(isSourceFile);
-            e.getPresentation().setVisible(isSourceFile);
+        if (project == null) {
+            return;
         }
+        final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(e.getDataContext());
+        boolean isSourceFile = CrowdinPropertiesLoader.isSourceFile(project, file);
+
+        e.getPresentation().setEnabled(isSourceFile);
+        e.getPresentation().setVisible(isSourceFile);
     }
 
     @Override

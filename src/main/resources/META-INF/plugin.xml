@@ -47,7 +47,7 @@
       <action id="Crowdin.RefreshTranslationProgressAction" text="Refresh" class="com.crowdin.ui.action.RefreshTranslationProgressAction"/>
     </group>
 
-    <action icon="/icons/icon.svg" id="Crowdin.Upload" class="com.crowdin.action.UploadFromContextAction" text="Upload to Crowdin" description="Upload this file to Crowdin">
+    <action icon="/icons/icon.svg" id="Crowdin.Upload" class="com.crowdin.action.UploadSourceFromContextAction" text="Upload Source File to Crowdin" description="Upload this source file to Crowdin">
       <add-to-group group-id="ProjectViewPopupMenu" />
     </action>
 
