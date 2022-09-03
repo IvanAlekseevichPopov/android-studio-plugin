@@ -1,7 +1,6 @@
 package com.crowdin.util;
 
 import com.crowdin.Constants;
-import com.crowdin.client.CrowdinConfiguration;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -11,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
-import static com.crowdin.Constants.PROPERTIES_FILE;
 import static com.crowdin.Constants.PROPERTIES_FILE_PATTERN;
 
 public class PropertyUtil {
@@ -31,7 +29,7 @@ public class PropertyUtil {
     private static Properties getPropertiesByConfiguration(Project project, String configurationName) {
         Properties[] propertiesCollection = getPropertiesCollection(project);
         for (Properties properties : propertiesCollection) {
-            if(properties.get(Constants.CONFIG_NAME).equals(configurationName)) {
+            if (properties.get(Constants.CONFIG_NAME).equals(configurationName)) {
                 return properties;
             }
         }
@@ -66,25 +64,9 @@ public class PropertyUtil {
         return propertiesCollection;
     }
 
-    @Deprecated
-    public static Properties getProperties(Project project) {
-        Properties properties = new Properties();
-        VirtualFile propertiesFile = getCrowdinPropertyFile(project);
-        if (propertiesFile == null) {
-            return null;
-        }
-        try (InputStream in = propertiesFile.getInputStream()) {
-            properties.load(in);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return properties;
-    }
-
-    public static boolean isPropertyFilesExist(Project project)
-    {
+    public static boolean isPropertyFilesExist(Project project) {
         ArrayList<VirtualFile> crowdinPropertyFiles = getCrowdinPropertyFiles(project);
-        if(crowdinPropertyFiles == null) {
+        if (crowdinPropertyFiles == null) {
             return false;
         }
 
@@ -113,20 +95,5 @@ public class PropertyUtil {
             return configurationFiles;
         }
         return null;
-    }
-
-    @Deprecated
-    public static VirtualFile getCrowdinPropertyFile(Project project) {
-        VirtualFile baseDir = FileUtil.getProjectBaseDir(project);
-        if (baseDir == null || !baseDir.isDirectory()) {
-            System.out.println("Base dir not exist");
-            return null;
-        }
-        VirtualFile child = baseDir.findChild(PROPERTIES_FILE);
-        if (child != null && child.exists()) {
-            return child;
-        } else {
-            return null;
-        }
     }
 }

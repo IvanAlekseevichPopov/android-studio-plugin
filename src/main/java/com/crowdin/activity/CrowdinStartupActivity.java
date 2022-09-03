@@ -1,12 +1,11 @@
 package com.crowdin.activity;
 
 import com.crowdin.client.Crowdin;
-import com.crowdin.client.CrowdinProjectCacheProvider;
 import com.crowdin.client.CrowdinConfiguration;
+import com.crowdin.client.CrowdinProjectCacheProvider;
 import com.crowdin.client.CrowdinPropertiesLoader;
 import com.crowdin.event.FileChangeListener;
 import com.crowdin.util.ActionUtils;
-import com.crowdin.util.GitUtil;
 import com.crowdin.util.NotificationUtil;
 import com.crowdin.util.PropertyUtil;
 import com.intellij.openapi.progress.ProgressIndicator;

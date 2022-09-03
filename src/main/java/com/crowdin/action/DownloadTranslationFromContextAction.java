@@ -1,13 +1,11 @@
 package com.crowdin.action;
 
 import com.crowdin.client.*;
-import com.crowdin.client.CrowdinConfiguration;
 import com.crowdin.client.languages.model.Language;
 import com.crowdin.client.sourcefiles.model.Branch;
 import com.crowdin.logic.BranchLogic;
 import com.crowdin.logic.ContextLogic;
 import com.crowdin.logic.CrowdinSettings;
-import com.crowdin.util.ActionUtils;
 import com.crowdin.util.FileUtil;
 import com.crowdin.util.NotificationUtil;
 import com.crowdin.util.UIUtil;
@@ -22,8 +20,6 @@ import lombok.NonNull;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.net.URL;
-import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static com.crowdin.Constants.MESSAGES_BUNDLE;
 

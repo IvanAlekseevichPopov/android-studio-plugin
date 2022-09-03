@@ -21,8 +21,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import lombok.NonNull;
 
 import java.net.URL;
-import java.util.Arrays;
-import java.util.Objects;
 
 import static com.crowdin.Constants.MESSAGES_BUNDLE;
 

@@ -100,13 +100,6 @@ public class CrowdinPropertiesLoader {
         return crowdinProperties;
     }
 
-    /** @deprecated use {@link #loadAll(Project)} */
-    @Deprecated
-    public static CrowdinConfiguration load(Project project) {
-        Properties properties = PropertyUtil.getProperties(project);
-        return CrowdinPropertiesLoader.load(properties);
-    }
-
     public static CrowdinConfiguration load(Properties properties) {
         List<String> errors = new ArrayList<>();
         List<String> notExistEnvVars = new ArrayList<>();
