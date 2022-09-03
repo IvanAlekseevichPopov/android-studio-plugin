@@ -1,20 +1,63 @@
 package com.crowdin.client;
 
-import com.crowdin.util.FileUtil;
-import com.crowdin.util.NotificationUtil;
-import com.crowdin.util.PropertyUtil;
-import com.crowdin.util.Util;
+import com.crowdin.logic.ContextLogic;
+import com.crowdin.util.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static com.crowdin.Constants.*;
 
 public class CrowdinPropertiesLoader {
+    private final static ConcurrentHashMap<String, CrowdinConfiguration> translationFiles = new ConcurrentHashMap<>();
+
+    public static CrowdinConfiguration getConfigurationByTransFile(Project project, VirtualFile file) {
+        CrowdinConfiguration crowdinConfiguration = translationFiles.get(file.getPath());
+        if(translationFiles.size() > 20) {
+            translationFiles.clear();
+        }
+        if (crowdinConfiguration != null) {
+            return crowdinConfiguration;
+        }
+
+        CrowdinConfiguration[] crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
+        for (CrowdinConfiguration configuration : crowdinConfigurations) {
+            if (isTranslationFile(project, file, configuration)) {
+                translationFiles.put(file.getPath(), configuration);
+                return configuration;
+            }
+        }
+
+        return null;
+    }
+
+    private static boolean isTranslationFile(Project project, VirtualFile file, CrowdinConfiguration crowdinConfiguration) {
+        boolean isTranslationFile = false;
+        try {
+
+            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
+            NotificationUtil.logDebugMessage(project, crowdinConfiguration.getConfigurationName(), MESSAGES_BUNDLE.getString("messages.debug.started_action"));
+
+            VirtualFile root = FileUtil.getProjectBaseDir(project);
+            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
+
+            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, false);
+
+            CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
+                    CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, false);
+
+            isTranslationFile = ContextLogic.findSourceFileFromTranslationFile(file, crowdinConfiguration, root, crowdinProjectCache).isPresent();
+        } catch (Exception exception) {
+//            do nothing
+        }
+        return isTranslationFile;
+    }
+
     public static CrowdinConfiguration getConfigurationBySourceFile(Project project, VirtualFile file) {
         CrowdinConfiguration[] crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
         CrowdinConfiguration selectedConfig = null;
