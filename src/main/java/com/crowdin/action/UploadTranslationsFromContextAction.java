@@ -31,7 +31,6 @@ import static com.crowdin.Constants.MESSAGES_BUNDLE;
  */
 public class UploadTranslationsFromContextAction extends BackgroundAction {
 
-
     @Override
     public void performInBackground(AnActionEvent anActionEvent, ProgressIndicator indicator) {
         final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(anActionEvent.getDataContext());
@@ -46,7 +45,10 @@ public class UploadTranslationsFromContextAction extends BackgroundAction {
             indicator.checkCanceled();
 
             VirtualFile root = FileUtil.getProjectBaseDir(project);
-            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+            CrowdinConfiguration crowdinConfiguration = CrowdinPropertiesLoader.getConfigurationByTransFile(project, file);
+            if (crowdinConfiguration == null) {
+                return;
+            }
             Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
             BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
@@ -54,7 +56,7 @@ public class UploadTranslationsFromContextAction extends BackgroundAction {
             indicator.checkCanceled();
 
             CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                CrowdinProjectCacheProvider.getInstance(crowdin, branchName, true);
+                    CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, true);
 
             if (!crowdinProjectCache.isManagerAccess()) {
                 NotificationUtil.showErrorMessage(project, "You need to have manager access to perform this action");
@@ -118,35 +120,15 @@ public class UploadTranslationsFromContextAction extends BackgroundAction {
     public void update(AnActionEvent e) {
         Project project = e.getProject();
         final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(e.getDataContext());
-        boolean isTranslationFile = false;
-        try {
-            if (file == null) {
-                return;
-            }
-            CrowdinConfiguration crowdinConfiguration;
-            try {
-                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
-            } catch (Exception exception) {
-                return;
-            }
-            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
-            NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            VirtualFile root = FileUtil.getProjectBaseDir(project);
-            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
-
-            String branchName = ActionUtils.getBranchName(project, crowdinConfiguration, false);
-
-            CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                CrowdinProjectCacheProvider.getInstance(crowdin, branchName, false);
-
-            isTranslationFile = ContextLogic.findSourceFileFromTranslationFile(file, crowdinConfiguration, root, crowdinProjectCache).isPresent();
-        } catch (Exception exception) {
-//            do nothing
-        } finally {
-            e.getPresentation().setEnabled(isTranslationFile);
-            e.getPresentation().setVisible(isTranslationFile);
+        if (file == null) {
+            return;
         }
+        boolean isTranslationFile = CrowdinPropertiesLoader.getConfigurationByTransFile(project, file) != null;
+
+        e.getPresentation().setEnabled(isTranslationFile);
+        e.getPresentation().setVisible(isTranslationFile);
+
     }
 
     @Override
