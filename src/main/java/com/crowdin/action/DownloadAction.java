@@ -34,33 +34,36 @@ public class DownloadAction extends BackgroundAction {
             }
             indicator.checkCanceled();
 
-            CrowdinConfiguration crowdinConfiguration;
+            CrowdinConfiguration[] crowdinConfigurations;
             try {
-                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+                crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
             } catch (Exception e) {
                 NotificationUtil.showErrorMessage(project, e.getMessage());
                 return;
             }
-            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
-            NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
+            for (CrowdinConfiguration crowdinConfiguration : crowdinConfigurations) {
+                NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
+                NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
-            String branchName = branchLogic.acquireBranchName(true);
-            indicator.checkCanceled();
+                Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
 
-            CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                CrowdinProjectCacheProvider.getInstance(crowdin, branchName, true);
+                BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
+                String branchName = branchLogic.acquireBranchName(true);
+                indicator.checkCanceled();
 
-            if (!crowdinProjectCache.isManagerAccess()) {
-                NotificationUtil.showErrorMessage(project, "You need to have manager access to perform this action");
-                return;
+                CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
+                        CrowdinProjectCacheProvider.getInstance(crowdin, "", branchName, true);
+
+                if (!crowdinProjectCache.isManagerAccess()) {
+                    NotificationUtil.showErrorMessage(project, "You need to have manager access to perform this action");
+                    return;
+                }
+
+                Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
+
+                (new DownloadTranslationsLogic(project, crowdin, crowdinConfiguration, root, crowdinProjectCache, branch)).process();
             }
-
-            Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
-
-            (new DownloadTranslationsLogic(project, crowdin, crowdinConfiguration, root, crowdinProjectCache, branch)).process();
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (Exception e) {

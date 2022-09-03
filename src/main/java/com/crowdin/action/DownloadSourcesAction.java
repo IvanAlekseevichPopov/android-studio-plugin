@@ -1,10 +1,6 @@
 package com.crowdin.action;
 
-import com.crowdin.client.Crowdin;
-import com.crowdin.client.CrowdinProjectCacheProvider;
-import com.crowdin.client.CrowdinConfiguration;
-import com.crowdin.client.CrowdinPropertiesLoader;
-import com.crowdin.client.FileBean;
+import com.crowdin.client.*;
 import com.crowdin.client.sourcefiles.model.Branch;
 import com.crowdin.client.sourcefiles.model.FileInfo;
 import com.crowdin.logic.BranchLogic;
@@ -19,6 +15,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import lombok.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,8 +41,6 @@ public class DownloadSourcesAction extends BackgroundAction {
     protected void performInBackground(@NonNull AnActionEvent anActionEvent, @NonNull ProgressIndicator indicator) {
         Project project = anActionEvent.getProject();
         try {
-            VirtualFile root = FileUtil.getProjectBaseDir(project);
-
             CrowdinSettings crowdinSettings = ServiceManager.getService(project, CrowdinSettings.class);
 
             boolean confirmation = UIUtil.confirmDialog(project, crowdinSettings, MESSAGES_BUNDLE.getString("messages.confirm.download"), "Download");
@@ -54,77 +49,16 @@ public class DownloadSourcesAction extends BackgroundAction {
             }
             indicator.checkCanceled();
 
-            CrowdinConfiguration crowdinConfiguration;
+            CrowdinConfiguration[] crowdinConfigurations;
             try {
-                crowdinConfiguration = CrowdinPropertiesLoader.load(project);
+                crowdinConfigurations = CrowdinPropertiesLoader.loadAll(project);
             } catch (Exception e) {
                 NotificationUtil.showErrorMessage(project, e.getMessage());
                 return;
             }
-            NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
-            NotificationUtil.logDebugMessage(project, MESSAGES_BUNDLE.getString("messages.debug.started_action"));
 
-            Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
-
-            BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
-            String branchName = branchLogic.acquireBranchName(true);
-            indicator.checkCanceled();
-
-            CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
-                CrowdinProjectCacheProvider.getInstance(crowdin, branchName, true);
-
-            Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
-
-            Map<String, FileInfo> filePaths = crowdinProjectCache.getFileInfos(branch);
-
-            AtomicBoolean isAnyFileDownloaded = new AtomicBoolean(false);
-
-            for (FileBean fileBean : crowdinConfiguration.getFiles()) {
-                Predicate<String> sourcePredicate = FileUtil.filePathRegex(fileBean.getSource(), crowdinConfiguration.isPreserveHierarchy());
-                Map<String, VirtualFile> localSourceFiles = (crowdinConfiguration.isPreserveHierarchy())
-                    ? Collections.emptyMap()
-                    : FileUtil.getSourceFilesRec(root, fileBean.getSource()).stream()
-                    .collect(Collectors.toMap(VirtualFile::getPath, Function.identity()));
-                List<String> foundSources = filePaths.keySet().stream()
-                    .map(FileUtil::unixPath)
-                    .filter(sourcePredicate)
-                    .map(FileUtil::normalizePath)
-                    .sorted()
-                    .collect(Collectors.toList());
-
-                if (foundSources.isEmpty()) {
-                    NotificationUtil.showWarningMessage(project, String.format(MESSAGES_BUNDLE.getString("errors.no_sources_for_pattern"), fileBean.getSource()));
-                    return;
-                }
-                for (String foundSourceFilePath : foundSources) {
-                    if (crowdinConfiguration.isPreserveHierarchy()) {
-                        Long fileId = filePaths.get(foundSourceFilePath).getId();
-                        this.downloadFile(crowdin, fileId, root, foundSourceFilePath);
-                        isAnyFileDownloaded.set(true);
-                    } else {
-                        List<String> fittingSources = localSourceFiles.keySet().stream()
-                            .filter(localSourceFilePath -> localSourceFilePath.endsWith(foundSourceFilePath))
-                            .collect(Collectors.toList());
-                        if (fittingSources.isEmpty()) {
-                            NotificationUtil.showWarningMessage(project, String.format(MESSAGES_BUNDLE.getString("errors.file_no_representative"), foundSourceFilePath));
-                            continue;
-                        } else if (fittingSources.size() > 1) {
-                            NotificationUtil.showWarningMessage(project, String.format(MESSAGES_BUNDLE.getString("errors.file_not_one_representative"), foundSourceFilePath));
-                            continue;
-                        }
-                        Long fileId = filePaths.get(foundSourceFilePath).getId();
-                        VirtualFile file = localSourceFiles.get(fittingSources.get(0));
-                        this.downloadFile(crowdin, fileId, file);
-                        isAnyFileDownloaded.set(true);
-                    }
-                    NotificationUtil.logDebugMessage(project, String.format(MESSAGES_BUNDLE.getString("messages.debug.download_sources.file_downloaded"), foundSourceFilePath));
-                }
-            }
-
-            if (isAnyFileDownloaded.get()) {
-                NotificationUtil.showInformationMessage(project, MESSAGES_BUNDLE.getString("messages.success.download_sources"));
-            } else {
-                NotificationUtil.showWarningMessage(project, MESSAGES_BUNDLE.getString("messages.failure.download_sources"));
+            for (CrowdinConfiguration crowdinConfiguration : crowdinConfigurations) {
+                performOneConfig(indicator, project, crowdinConfiguration);
             }
 
         } catch (ProcessCanceledException e) {
@@ -132,6 +66,75 @@ public class DownloadSourcesAction extends BackgroundAction {
         } catch (Exception e) {
             NotificationUtil.logErrorMessage(project, e);
             NotificationUtil.showErrorMessage(project, e.getMessage());
+        }
+    }
+
+    private void performOneConfig(@NotNull ProgressIndicator indicator, Project project, CrowdinConfiguration crowdinConfiguration) {
+        NotificationUtil.setLogDebugLevel(crowdinConfiguration.isDebug());
+        NotificationUtil.logDebugMessage(project, crowdinConfiguration.getConfigurationName(), MESSAGES_BUNDLE.getString("messages.debug.started_action"));
+
+        Crowdin crowdin = new Crowdin(project, crowdinConfiguration.getProjectId(), crowdinConfiguration.getApiToken(), crowdinConfiguration.getBaseUrl());
+
+        BranchLogic branchLogic = new BranchLogic(crowdin, project, crowdinConfiguration);
+        String branchName = branchLogic.acquireBranchName(true);
+        indicator.checkCanceled();
+
+        CrowdinProjectCacheProvider.CrowdinProjectCache crowdinProjectCache =
+            CrowdinProjectCacheProvider.getInstance(crowdin, crowdinConfiguration.getConfigurationName(), branchName, true);
+
+        Branch branch = branchLogic.getBranch(crowdinProjectCache, false);
+
+        Map<String, FileInfo> filePaths = crowdinProjectCache.getFileInfos(branch);
+
+        AtomicBoolean isAnyFileDownloaded = new AtomicBoolean(false);
+        VirtualFile root = FileUtil.getProjectBaseDir(project);
+
+        for (FileBean fileBean : crowdinConfiguration.getFiles()) {
+            Predicate<String> sourcePredicate = FileUtil.filePathRegex(fileBean.getSource(), crowdinConfiguration.isPreserveHierarchy());
+            Map<String, VirtualFile> localSourceFiles = (crowdinConfiguration.isPreserveHierarchy())
+                ? Collections.emptyMap()
+                : FileUtil.getSourceFilesRec(root, fileBean.getSource()).stream()
+                .collect(Collectors.toMap(VirtualFile::getPath, Function.identity()));
+            List<String> foundSources = filePaths.keySet().stream()
+                .map(FileUtil::unixPath)
+                .filter(sourcePredicate)
+                .map(FileUtil::normalizePath)
+                .sorted()
+                .collect(Collectors.toList());
+
+            if (foundSources.isEmpty()) {
+                NotificationUtil.showWarningMessage(project, String.format(MESSAGES_BUNDLE.getString("errors.no_sources_for_pattern"), fileBean.getSource()));
+                return;
+            }
+            for (String foundSourceFilePath : foundSources) {
+                if (crowdinConfiguration.isPreserveHierarchy()) {
+                    Long fileId = filePaths.get(foundSourceFilePath).getId();
+                    this.downloadFile(crowdin, fileId, root, foundSourceFilePath);
+                    isAnyFileDownloaded.set(true);
+                } else {
+                    List<String> fittingSources = localSourceFiles.keySet().stream()
+                        .filter(localSourceFilePath -> localSourceFilePath.endsWith(foundSourceFilePath))
+                        .collect(Collectors.toList());
+                    if (fittingSources.isEmpty()) {
+                        NotificationUtil.showWarningMessage(project, String.format(MESSAGES_BUNDLE.getString("errors.file_no_representative"), foundSourceFilePath));
+                        continue;
+                    } else if (fittingSources.size() > 1) {
+                        NotificationUtil.showWarningMessage(project, String.format(MESSAGES_BUNDLE.getString("errors.file_not_one_representative"), foundSourceFilePath));
+                        continue;
+                    }
+                    Long fileId = filePaths.get(foundSourceFilePath).getId();
+                    VirtualFile file = localSourceFiles.get(fittingSources.get(0));
+                    this.downloadFile(crowdin, fileId, file);
+                    isAnyFileDownloaded.set(true);
+                }
+                NotificationUtil.logDebugMessage(project, crowdinConfiguration.getConfigurationName(), String.format(MESSAGES_BUNDLE.getString("messages.debug.download_sources.file_downloaded"), foundSourceFilePath));
+            }
+        }
+
+        if (isAnyFileDownloaded.get()) {
+            NotificationUtil.showInformationMessage(project, MESSAGES_BUNDLE.getString("messages.success.download_sources"));
+        } else {
+            NotificationUtil.showWarningMessage(project, MESSAGES_BUNDLE.getString("messages.failure.download_sources"));
         }
     }
 
